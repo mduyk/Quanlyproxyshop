@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>QUẢN LÝ TỔNG HỢP (SAFE)</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        :root { --bg: #0d0d16; --card: #161625; --cyan: #00f2ff; --red: #ff4444; --green: #00ff88; }
+        body { background: var(--bg); color: white; font-family: sans-serif; padding: 20px; }
+        .box { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
+        input, select, textarea { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; background: #000; color: #fff; border: 1px solid #444; box-sizing: border-box; }
+        button { padding: 12px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; width: 100%; }
+        .btn-add { background: var(--cyan); color: #000; }
+        .btn-del { background: none; border: 1px solid var(--red); color: var(--red); margin-top: 10px; }
+        h3 { color: var(--cyan); margin-top: 0; border-left: 4px solid var(--cyan); padding-left: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h3>👤 CẤP TÀI KHOẢN SHOP 2</h3>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="new-u" placeholder="Tên tài khoản...">
+            <input type="text" id="new-p" placeholder="Mật khẩu...">
+        </div>
+        <button class="btn-add" onclick="createUser()">TẠO TÀI KHOẢN MỚI</button>
+    </div>
+
+    <div class="box">
+        <h3>🔑 QUẢN LÝ KHO KEY</h3>
+        <div style="display:flex; gap:10px;">
+            <select id="s-shop" onchange="load()"><option value="shop1">SHOP 1</option><option value="shop2">SHOP 2</option></select>
+            <select id="s-pkg"><option value="ngay">Ngày</option><option value="tuan">Tuần</option><option value="thang">Tháng</option><option value="nam">Năm</option></select>
+        </div>
+        <textarea id="k-in" rows="5" placeholder="Dán key mới vào đây..."></textarea>
+        <button class="btn-add" onclick="addKeys()">NHẬP KHO</button>
+        <div id="stat" style="margin-top:10px; font-size:13px;"></div>
+        <button class="btn-del" onclick="clearKeys()">XÓA TRẮNG GÓI KEY NÀY</button>
+    </div>
+
+<script>
+    const config = { apiKey: "AIzaSyBk6R1TDZeAxh37JQLgL_6Wl0v8m8Sg0", databaseURL: "https://shopctv-61f96-default-rtdb.asia-southeast1.firebasedatabase.app/" };
+    firebase.initializeApp(config);
+    const db = firebase.database();
+
+    // Hàm tạo tài khoản cho Shop 2
+    function createUser() {
+        const u = document.getElementById('new-u').value.trim().toLowerCase();
+        const p = document.getElementById('new-p').value.trim();
+        if(!u || !p) return alert("Nhập đủ tên và mật khẩu!");
+
+        db.ref('users_shop2/' + u).set({
+            password: p,
+            balance: 0
+        }).then(() => {
+            alert("Đã tạo tài khoản " + u + " thành công cho Shop 2!");
+            document.getElementById('new-u').value = "";
+            document.getElementById('new-p').value = "";
+        });
+    }
+
+    // Hàm load thống kê key
+    function load() {
+        const s = document.getElementById('s-shop').value;
+        db.ref('keys/' + s).on('value', snap => {
+            const d = snap.val() || {};
+            const c = (p) => d[p] ? Object.keys(d[p]).length : 0;
+            document.getElementById('stat').innerHTML = `Kho ${s}: Ngày(${c('ngay')}) | Tuần(${c('tuan')}) | Tháng(${c('thang')}) | Năm(${c('nam')})`;
+        });
+    }
+    load();
+
+    // Thêm key an toàn
+    async function addKeys() {
+        const s = document.getElementById('s-shop').value;
+        const p = document.getElementById('s-pkg').value;
+        const raw = document.getElementById('k-in').value;
+        if(!raw.trim()) return;
+
+        let ins = [...new Set(raw.split('\n').map(k=>k.trim()).filter(k=>k!==""))];
+        const snap = await db.ref('keys/' + s + '/' + p).once('value');
+        const exist = snap.val() ? Object.values(snap.val()) : [];
+        let toAdd = ins.filter(k => !exist.includes(k));
+
+        if(toAdd.length > 0) {
+            const up = {};
+            toAdd.forEach(k => { const id = db.ref('keys/'+s+'/'+p).push().key; up[id] = k; });
+            await db.ref('keys/' + s + '/' + p).update(up);
+            alert("Đã thêm " + toAdd.length + " key!");
+            document.getElementById('k-in').value = "";
+        } else alert("Key bị trùng hết rồi!");
+    }
+
+    // Xóa key - Chỉ xóa nhánh keys, không động vào users
+    function clearKeys() {
+        const s = document.getElementById('s-shop').value;
+        const p = document.getElementById('s-pkg').value;
+        if(confirm("Xóa sạch key gói " + p + " của " + s + "?")) {
+            db.ref('keys/' + s + '/' + p).remove();
+        }
+    }
+</script>
+</body>
+</html>
